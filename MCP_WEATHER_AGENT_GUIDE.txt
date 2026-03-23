@@ -1,0 +1,132 @@
+MCP WEATHER AGENT QUICK DEPLOY GUIDE
+
+Project name:
+mcp-agent
+
+Internal ADK agent name:
+mcp_agent
+
+Recommended model:
+gemini-2.5-flash
+
+1. Set variables
+
+gcloud config set project YOUR_PROJECT_ID
+
+PROJECT_ID="$(gcloud config get-value project)"
+PROJECT_NUMBER="$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')"
+REGION="us-central1"
+MODEL_LOCATION="us-central1"
+SERVICE_NAME="mcp-agent"
+REPO_NAME="mcp-agent-repo"
+IMAGE_NAME="mcp-agent"
+TAG="v1"
+SA_NAME="mcp-agent-sa"
+SA_EMAIL="${SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
+BUILD_SA="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+IMAGE_URI="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${IMAGE_NAME}:${TAG}"
+
+2. Enable APIs
+
+gcloud services enable \
+  run.googleapis.com \
+  cloudbuild.googleapis.com \
+  artifactregistry.googleapis.com \
+  aiplatform.googleapis.com \
+  iam.googleapis.com
+
+3. Create runtime service account
+
+gcloud iam service-accounts create "${SA_NAME}" \
+  --display-name="Cloud Run service account for mcp-agent"
+
+4. IAM roles
+
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:${SA_EMAIL}" \
+  --role="roles/aiplatform.user"
+
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:${BUILD_SA}" \
+  --role="roles/storage.admin"
+
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:${BUILD_SA}" \
+  --role="roles/cloudbuild.builds.builder"
+
+5. Create Artifact Registry repo
+
+gcloud artifacts repositories create "$REPO_NAME" \
+  --repository-format=docker \
+  --location="$REGION" \
+  --description="Docker repository for mcp-agent"
+
+6. Build and push
+
+gcloud builds submit --tag "$IMAGE_URI"
+
+7. Deploy
+
+gcloud run deploy "$SERVICE_NAME" \
+  --image "$IMAGE_URI" \
+  --region "$REGION" \
+  --platform managed \
+  --allow-unauthenticated \
+  --service-account "$SA_EMAIL" \
+  --memory 1Gi \
+  --cpu 1 \
+  --timeout 300 \
+  --set-env-vars "GOOGLE_CLOUD_PROJECT=${PROJECT_ID},GOOGLE_CLOUD_LOCATION=${MODEL_LOCATION},GOOGLE_GENAI_USE_VERTEXAI=TRUE,GEMINI_MODEL=gemini-2.5-flash"
+
+SERVICE_URL="$(gcloud run services describe "$SERVICE_NAME" --region="$REGION" --format='value(status.url)')"
+echo "$SERVICE_URL"
+
+8. Test
+
+curl "${SERVICE_URL}/health" | python3 -m json.tool
+
+curl -X POST "${SERVICE_URL}/weather" \
+  -H "Content-Type: application/json" \
+  -d '{"city":"Delhi"}' | python3 -m json.tool
+
+9. Important fixes from earlier errors
+
+- If ADK says invalid agent name, use `name="mcp_agent"` and not `mcp-agent`
+- If repository parsing fails, `REPO_NAME` is empty
+- If `--tag` is invalid, `IMAGE_URI` is empty or malformed
+- If Cloud Build gets `storage.objects.get denied`, grant roles to `BUILD_SA`
+- If Cloud Run service parsing fails, `SERVICE_NAME` is empty
+- If Vertex AI gets `PERMISSION_DENIED`, grant `roles/aiplatform.user` to `SA_EMAIL`
+- If model `gemini-2.0-flash` returns `NOT_FOUND`, use `gemini-2.5-flash`
+
+10. Pretty public endpoint test
+
+SERVICE_URL="https://mcp-agent-60096438952.us-central1.run.app"
+
+curl -s -X POST "${SERVICE_URL}/weather" \
+  -H "Content-Type: application/json" \
+  -d '{"city":"Delhi"}' | python3 -c '
+import json,sys
+data=json.load(sys.stdin)
+print("=" * 52)
+print("MCP WEATHER AGENT STATUS")
+print("=" * 52)
+print(f"City        : {data.get(\"city\")}")
+print(f"Status      : {data.get(\"status\")}")
+print(f"Answer      : {data.get(\"answer\")}")
+weather=data.get("weather_data") or {}
+if weather:
+    print("-" * 52)
+    print("WEATHER SUMMARY")
+    print("-" * 52)
+    print(f"Resolved    : {weather.get(\"resolved_city\")}, {weather.get(\"country\")}")
+    print(f"Condition   : {weather.get(\"weather_description\")}")
+    print(f"Temperature : {weather.get(\"temperature_c\")} C")
+    print(f"Feels Like  : {weather.get(\"apparent_temperature_c\")} C")
+    print(f"Humidity    : {weather.get(\"relative_humidity_pct\")} %")
+    print(f"Wind Speed  : {weather.get(\"wind_speed_kmh\")} km/h")
+    print(f"Cloud Cover : {weather.get(\"cloud_cover_pct\")} %")
+    print(f"Observed At : {weather.get(\"observation_time\")}")
+    print(f"Source      : {weather.get(\"source\")}")
+print("=" * 52)
+'

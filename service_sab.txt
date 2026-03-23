@@ -1,0 +1,48 @@
+SERVICE SUMMARY FOR MCP WEATHER AGENT
+
+Deployed Cloud Run URL:
+https://mcp-agent-60096438952.us-central1.run.app
+
+Health endpoint:
+GET /health
+
+Weather endpoint:
+POST /weather
+
+Sample request body:
+{"city":"Delhi"}
+
+Quick health check:
+curl "https://mcp-agent-60096438952.us-central1.run.app/health" | python3 -m json.tool
+
+Beautiful weather test command with clean summary:
+
+SERVICE_URL="https://mcp-agent-60096438952.us-central1.run.app"
+
+curl -s -X POST "${SERVICE_URL}/weather" \
+  -H "Content-Type: application/json" \
+  -d '{"city":"Delhi"}' | python3 -c '
+import json,sys
+data=json.load(sys.stdin)
+print("=" * 52)
+print("MCP WEATHER AGENT STATUS")
+print("=" * 52)
+print(f"City        : {data.get(\"city\")}")
+print(f"Status      : {data.get(\"status\")}")
+print(f"Answer      : {data.get(\"answer\")}")
+weather=data.get("weather_data") or {}
+if weather:
+    print("-" * 52)
+    print("WEATHER SUMMARY")
+    print("-" * 52)
+    print(f"Resolved    : {weather.get(\"resolved_city\")}, {weather.get(\"country\")}")
+    print(f"Condition   : {weather.get(\"weather_description\")}")
+    print(f"Temperature : {weather.get(\"temperature_c\")} C")
+    print(f"Feels Like  : {weather.get(\"apparent_temperature_c\")} C")
+    print(f"Humidity    : {weather.get(\"relative_humidity_pct\")} %")
+    print(f"Wind Speed  : {weather.get(\"wind_speed_kmh\")} km/h")
+    print(f"Cloud Cover : {weather.get(\"cloud_cover_pct\")} %")
+    print(f"Observed At : {weather.get(\"observation_time\")}")
+    print(f"Source      : {weather.get(\"source\")}")
+print("=" * 52)
+'
