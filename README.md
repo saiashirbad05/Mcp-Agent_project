@@ -1,4 +1,4 @@
-# mcp-agent-project
+# Mcp-Agent-Project
 
 `mcp-agent-project` is a beginner-friendly but production-shaped weather agent built with Google ADK, MCP, FastAPI, Docker, Artifact Registry, and Cloud Run.
 
@@ -6,7 +6,7 @@ It accepts a city in JSON, retrieves structured weather data through an MCP tool
 
 ## Live Deployment
 
-- Cloud Run base URL: [https://mcp-agent-60096438952.us-central1.run.app](https://mcp-agent-60096438952.us-central1.run.app)
+- Cloud Run base URL: EX-- [https://mcp-agent-60096438952.us-central1.run.app](https://mcp-agent-60096438952.us-central1.run.app)
 - Health endpoint: `GET /health`
 - Main endpoint: `POST /weather`
 
