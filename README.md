@@ -1,4 +1,4 @@
-# Mcp-Agent-Project
+# MCP-Agent-Project  (Track-2-GEN AI APAC COHORT-1)
 
 `mcp-agent-project` is a beginner-friendly but production-shaped weather agent built with Google ADK, MCP, FastAPI, Docker, Artifact Registry, and Cloud Run.
 
